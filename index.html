@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Timesheet to Excel</title>
+    <title>Konverter PDF (Gambar) ke Excel dengan OCR</title>
     
     <!-- Menggunakan Tailwind CSS untuk styling yang modern -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -39,8 +39,8 @@
 
     <div class="w-full max-w-2xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 space-y-6">
         <div class="text-center">
-            <h1 class="text-3xl font-bold text-indigo-600 dark:text-indigo-400">Timesheet to Excel</h1>
-            <p class="text-gray-600 dark:text-gray-400 mt-2">Convert PDF with images to Excel sheet</p>
+            <h1 class="text-3xl font-bold text-indigo-600 dark:text-indigo-400">Timesheet PDF to Excel</h1>
+            <p class="text-gray-600 dark:text-gray-400 mt-2">Convert PDF with timesheet to Excel sheet</p>
         </div>
 
         <!-- Area Input File -->
@@ -191,6 +191,7 @@
 
             ATURAN KETAT:
             - **Format Waktu:** Untuk kolom yang berisi waktu (seperti 'Time In', 'Time Out'), format nilainya sebagai "HH:MM". Contoh: '0800' menjadi "08:00", '1730' menjadi "17:30". Jika waktu tidak ada, gunakan string kosong.
+            - **Isi Sel Kosong:** Jika dalam satu baris, kolom waktu (Time In/Out) kosong, periksa kolom aktivitas di baris tersebut. Jika aktivitasnya "Sakit", isi sel waktu yang kosong dengan "S". Jika "Field Break", isi dengan "FB". Jika "Izin", isi dengan "I". Lakukan hal yang sama untuk keterangan sejenis lainnya.
             - **JANGAN SERTAKAN** logo perusahaan atau nama perusahaan dari kop surat. Hanya ekstrak 5 bidang data yang diminta di atas.
             - **JANGAN SERTAKAN** kolom "Remarks" dan "Sign" (atau kolom sejenis untuk tanda tangan/catatan) dari tabel.
             - **JANGAN SERTAKAN** seluruh bagian footer (misalnya "Prepared by", "Approved by", dan area tanda tangan di bawah tabel).
