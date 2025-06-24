@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TIMESHEET TO EXCEL</title>
+    <title>Konverter PDF (Gambar) ke Excel dengan OCR</title>
     
     <!-- Menggunakan Tailwind CSS untuk styling yang modern -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -39,8 +39,8 @@
 
     <div class="w-full max-w-2xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 space-y-6">
         <div class="text-center">
-            <h1 class="text-3xl font-bold text-indigo-600 dark:text-indigo-400">Time Sheet to Excel</h1>
-            <p class="text-gray-600 dark:text-gray-400 mt-2">Convert a PDF file containing images into an Excel spreadsheet.</p>
+            <h1 class="text-3xl font-bold text-indigo-600 dark:text-indigo-400">Konverter PDF ke Excel</h1>
+            <p class="text-gray-600 dark:text-gray-400 mt-2">Ubah halaman PDF yang berisi gambar menjadi sheet Excel terpisah menggunakan AI.</p>
         </div>
 
         <!-- Area Input File -->
@@ -178,7 +178,7 @@
 
         async function getStructuredDataFromImage(base64ImageData, pageNumber) {
             const model = 'gemini-2.0-flash';
-            const apiKey = "AIzaSyAHlg7c4qj8AWdueBeHS_4Y4m1ZOPMypq8";
+            const apiKey = "";
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
             const prompt = `
@@ -190,6 +190,7 @@
             3.  **Ekstrak Data Tabel Utama:** Ambil semua baris dari tabel timesheet.
 
             ATURAN KETAT:
+            - **Format Waktu:** Untuk kolom yang berisi waktu (seperti 'Time In', 'Time Out'), format nilainya sebagai "HH:MM". Contoh: '0800' menjadi "08:00", '1730' menjadi "17:30". Jika waktu tidak ada, gunakan string kosong.
             - **JANGAN SERTAKAN** logo perusahaan atau nama perusahaan dari kop surat. Hanya ekstrak 5 bidang data yang diminta di atas.
             - **JANGAN SERTAKAN** kolom "Remarks" dan "Sign" (atau kolom sejenis untuk tanda tangan/catatan) dari tabel.
             - **JANGAN SERTAKAN** seluruh bagian footer (misalnya "Prepared by", "Approved by", dan area tanda tangan di bawah tabel).
