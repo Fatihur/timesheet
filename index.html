@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Konverter PDF (Gambar) ke Excel dengan OCR</title>
+    
+    <!-- Menggunakan Tailwind CSS untuk styling yang modern -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Mengimpor library PDF.js dari Mozilla untuk memproses PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    
+    <!-- Mengimpor library SheetJS (xlsx) untuk membuat file Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <style>
+        /* Custom styles untuk tampilan yang lebih baik */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Menghapus loader lama, karena sudah tidak dipakai */
+        .file-input-label {
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+        }
+        .file-input-label:hover {
+            background-color: #4f46e5;
+        }
+        #progress-bar {
+            transition: width 0.3s ease-in-out;
+        }
+    </style>
+     <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-2xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 space-y-6">
+        <div class="text-center">
+            <h1 class="text-3xl font-bold text-indigo-600 dark:text-indigo-400">Konverter PDF ke Excel</h1>
+            <p class="text-gray-600 dark:text-gray-400 mt-2">Ubah halaman PDF yang berisi gambar menjadi sheet Excel terpisah menggunakan AI.</p>
+        </div>
+
+        <!-- Area Input File -->
+        <div class="space-y-4">
+            <div>
+                <label for="pdf-file" class="file-input-label inline-block w-full text-center bg-indigo-600 text-white font-semibold py-3 px-4 rounded-lg shadow-md">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 inline-block mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    Pilih File PDF
+                </label>
+                <input type="file" id="pdf-file" class="hidden" accept=".pdf">
+            </div>
+            <p id="file-name" class="text-center text-sm text-gray-500 dark:text-gray-400">Belum ada file yang dipilih.</p>
+        </div>
+
+        <!-- Tombol Konversi -->
+        <div>
+            <button id="convert-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors" disabled>
+                Konversi ke Excel
+            </button>
+        </div>
+        
+        <!-- Area Status dan Hasil -->
+        <div id="status-container" class="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg min-h-[100px] flex flex-col items-center justify-center space-y-3">
+             <p id="status" class="text-gray-500 dark:text-gray-300">Silakan pilih file PDF dan klik konversi.</p>
+             <!-- Elemen Progress Bar Baru -->
+             <div id="progress-container" class="w-full bg-gray-200 rounded-full h-4 dark:bg-gray-700 hidden">
+                <div id="progress-bar" class="bg-indigo-600 h-4 rounded-full text-xs font-medium text-blue-100 text-center p-0.5 leading-none" style="width: 0%"></div>
+             </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Penting: Atur lokasi worker untuk PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js`;
+
+        // Seleksi elemen DOM
+        const pdfFileInput = document.getElementById('pdf-file');
+        const convertBtn = document.getElementById('convert-btn');
+        const fileNameDisplay = document.getElementById('file-name');
+        const statusDisplay = document.getElementById('status');
+        const progressContainer = document.getElementById('progress-container');
+        const progressBar = document.getElementById('progress-bar');
+        const statusContainerDiv = document.getElementById('status-container');
+
+        let selectedFile = null;
+
+        // Event listener saat file dipilih
+        pdfFileInput.addEventListener('change', (event) => {
+            selectedFile = event.target.files[0];
+            if (selectedFile) {
+                fileNameDisplay.textContent = `File terpilih: ${selectedFile.name}`;
+                convertBtn.disabled = false;
+            } else {
+                fileNameDisplay.textContent = 'Belum ada file yang dipilih.';
+                convertBtn.disabled = true;
+            }
+        });
+
+        // Event listener saat tombol konversi diklik
+        convertBtn.addEventListener('click', handleConversion);
+
+        /**
+         * Fungsi utama untuk menangani proses konversi dari PDF ke Excel
+         */
+        async function handleConversion() {
+            if (!selectedFile) {
+                updateStatus('Error: Tidak ada file yang dipilih.', true);
+                return;
+            }
+
+            // Reset UI dan tampilkan progress bar
+            convertBtn.disabled = true;
+            pdfFileInput.disabled = true;
+            progressContainer.classList.remove('hidden');
+            updateProgress(0, 0, 0);
+            
+            try {
+                const fileReader = new FileReader();
+                fileReader.readAsArrayBuffer(selectedFile);
+
+                fileReader.onload = async (event) => {
+                    const pdfData = new Uint8Array(event.target.result);
+                    const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
+                    const numPages = pdf.numPages;
+                    const allPagesData = [];
+
+                    for (let i = 1; i <= numPages; i++) {
+                        // Update progress bar untuk setiap halaman
+                        const progress = Math.round(((i-1) / numPages) * 100);
+                        updateProgress(progress, i, numPages);
+                        
+                        const page = await pdf.getPage(i);
+                        const viewport = page.getViewport({ scale: 2.0 });
+                        const canvas = document.createElement('canvas');
+                        const context = canvas.getContext('2d');
+                        canvas.height = viewport.height;
+                        canvas.width = viewport.width;
+                        await page.render({ canvasContext: context, viewport: viewport }).promise;
+
+                        const imageDataUrl = canvas.toDataURL('image/jpeg');
+                        const base64ImageData = imageDataUrl.split(',')[1];
+
+                        const structuredData = await getStructuredDataFromImage(base64ImageData, i);
+                        if (structuredData) {
+                            allPagesData.push(structuredData);
+                        }
+                    }
+
+                    if (allPagesData.length > 0) {
+                        updateProgress(100, numPages, numPages, 'Membuat file Excel...');
+                        generateExcel(allPagesData, selectedFile.name.replace('.pdf', ''));
+                        // Memberi sedikit jeda sebelum menampilkan pesan sukses
+                        setTimeout(() => {
+                           updateStatus(`Konversi berhasil! File Excel telah diunduh.`, false);
+                        }, 500);
+                    } else {
+                        updateStatus('Tidak ada data yang dapat diekstrak dari PDF.', true);
+                    }
+                };
+
+                fileReader.onerror = () => {
+                    updateStatus('Error: Gagal membaca file PDF.', true);
+                };
+
+            } catch (error) {
+                console.error('Terjadi kesalahan:', error);
+                updateStatus(`Error: ${error.message}`, true);
+            } finally {
+                // Jangan reset UI disini, biarkan updateStatus yang mengontrolnya
+            }
+        }
+
+        async function getStructuredDataFromImage(base64ImageData, pageNumber) {
+            const model = 'gemini-2.0-flash';
+            const apiKey = "AIzaSyAHlg7c4qj8AWdueBeHS_4Y4m1ZOPMypq8";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+            const prompt = `
+            Analisis gambar timesheet ini dan ekstrak informasi dalam format JSON yang terstruktur.
+
+            TUGAS:
+            1.  **Ekstrak Informasi Header:** Temukan dan ekstrak data berikut: Nama, Posisi, Level, Lokasi, dan No. Badge. Jika salah satu data tidak ada, biarkan nilainya string kosong.
+            2.  **Gunakan Nama untuk Nama Sheet:** Gunakan nilai dari "Nama" yang ditemukan sebagai nilai untuk "sheetName".
+            3.  **Ekstrak Data Tabel Utama:** Ambil semua baris dari tabel timesheet.
+
+            ATURAN KETAT:
+            - **JANGAN SERTAKAN** logo perusahaan atau nama perusahaan dari kop surat. Hanya ekstrak 5 bidang data yang diminta di atas.
+            - **JANGAN SERTAKAN** kolom "Remarks" dan "Sign" (atau kolom sejenis untuk tanda tangan/catatan) dari tabel.
+            - **JANGAN SERTAKAN** seluruh bagian footer (misalnya "Prepared by", "Approved by", dan area tanda tangan di bawah tabel).
+            - Jika ada baris kosong di dalam tabel, sertakan sebagai array kosong.
+
+            KEMBALIKAN HANYA JSON dengan struktur ini. JANGAN TAMBAHKAN TEKS LAIN SEBELUM ATAU SESUDAH JSON:
+            {
+              "sheetName": "Nama Personel yang Ditemukan",
+              "headerInfo": {
+                "Nama": "Nilai Nama",
+                "Posisi": "Nilai Posisi",
+                "Level": "Nilai Level",
+                "Lokasi": "Nilai Lokasi",
+                "No. Badge": "Nilai No. Badge"
+              },
+              "tableData": [
+                ["Header Kolom 1", "Header Kolom 2"],
+                ["Data Baris 1 Kolom 1", "Data Baris 1 Kolom 2"],
+                ["Data Baris 2 Kolom 1", "Data Baris 2 Kolom 2"]
+              ]
+            }
+
+            Jika nama tidak bisa ditemukan sama sekali, gunakan "Halaman ${pageNumber}" untuk sheetName.
+            `;
+            
+            const payload = {
+                contents: [{
+                    role: "user",
+                    parts: [
+                        { text: prompt },
+                        { inlineData: { mimeType: "image/jpeg", data: base64ImageData } }
+                    ]
+                }],
+                 generationConfig: {
+                    responseMimeType: "application/json",
+                }
+            };
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorBody = await response.json();
+                    throw new Error(`API Error: ${response.status} ${response.statusText} - ${errorBody.error.message}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.candidates && result.candidates.length > 0) {
+                    const jsonString = result.candidates[0].content.parts[0].text;
+                    return JSON.parse(jsonString);
+                } else {
+                    return { sheetName: `Halaman ${pageNumber}`, tableData: [["Gagal mengekstrak data."]] };
+                }
+            } catch (error) {
+                return { sheetName: `Halaman ${pageNumber} (Error)`, tableData: [[`Error saat OCR: ${error.message}`]] };
+            }
+        }
+
+        function generateExcel(allPagesData, baseFileName) {
+            const workbook = XLSX.utils.book_new();
+
+            allPagesData.forEach((pageData, index) => {
+                let sheetName = pageData.sheetName || `Sheet ${index + 1}`;
+                sheetName = sheetName.substring(0, 31).replace(/[\/\\?*\[\]]/g, '');
+                if (workbook.SheetNames.includes(sheetName)) {
+                    sheetName = `${sheetName.substring(0, 27)} (${index + 1})`;
+                }
+                
+                const dataForSheet = [];
+                let tableHeaderRowIndex = 0;
+
+                if (pageData.headerInfo) {
+                    dataForSheet.push(["Nama", pageData.headerInfo.Nama || ""]);
+                    dataForSheet.push(["Posisi", pageData.headerInfo.Posisi || ""]);
+                    dataForSheet.push(["Level", pageData.headerInfo.Level || ""]);
+                    dataForSheet.push(["Lokasi", pageData.headerInfo.Lokasi || ""]);
+                    dataForSheet.push(["No. Badge", pageData.headerInfo['No. Badge'] || ""]);
+                    dataForSheet.push([]);
+                    tableHeaderRowIndex = 5;
+                }
+                
+                const finalSheetData = dataForSheet.concat(pageData.tableData || []);
+                const worksheet = XLSX.utils.aoa_to_sheet(finalSheetData);
+
+                const colWidths = [];
+                finalSheetData.forEach(row => {
+                    row.forEach((cell, i) => {
+                        const cellLen = cell ? String(cell).length : 10;
+                        if (!colWidths[i] || cellLen > colWidths[i]) {
+                            colWidths[i] = cellLen;
+                        }
+                    });
+                });
+                worksheet['!cols'] = colWidths.map(w => ({ wch: w + 2 }));
+
+                const borderStyle = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+                const range = XLSX.utils.decode_range(worksheet['!ref']);
+                for (let R = range.s.r; R <= range.e.r; ++R) {
+                    for (let C = range.s.c; C <= range.e.c; ++C) {
+                        const cell_ref = XLSX.utils.encode_cell({ c: C, r: R });
+                        if (!worksheet[cell_ref]) continue;
+
+                        if (R < tableHeaderRowIndex && C === 0) {
+                            worksheet[cell_ref].s = { font: { bold: true } };
+                        }
+
+                        if (R === tableHeaderRowIndex + 1) {
+                            worksheet[cell_ref].s = {
+                                font: { bold: true, color: { rgb: "FFFFFF" } },
+                                fill: { fgColor: { rgb: "4F81BD" } },
+                                border: borderStyle
+                            };
+                        } else if (R > tableHeaderRowIndex + 1 && finalSheetData[R] && finalSheetData[R].length > 0) {
+                            if (!worksheet[cell_ref].s) worksheet[cell_ref].s = {};
+                            worksheet[cell_ref].s.border = borderStyle;
+                        }
+                    }
+                }
+                
+                XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+            });
+
+            XLSX.writeFile(workbook, `${baseFileName}_hasil_ocr_terformat.xlsx`);
+        }
+        
+        /**
+         * Memperbarui progress bar dan teks statusnya.
+         */
+        function updateProgress(percentage, currentPage, totalPages, message) {
+            progressBar.style.width = `${percentage}%`;
+            progressBar.textContent = `${percentage}%`;
+            if(message) {
+                 statusDisplay.textContent = message;
+            } else if (totalPages > 0) {
+                statusDisplay.textContent = `Memproses halaman ${currentPage} dari ${totalPages}...`;
+            } else {
+                 statusDisplay.textContent = `Memulai...`;
+            }
+        }
+
+        /**
+         * Helper untuk memperbarui teks status final di UI.
+         */
+        function updateStatus(message, isError = false) {
+             // Sembunyikan progress bar dan tampilkan pesan final
+             progressContainer.classList.add('hidden');
+             statusDisplay.textContent = message;
+
+             // Reset tombol
+             convertBtn.disabled = false;
+             pdfFileInput.disabled = false;
+             
+             // Atur warna berdasarkan status (error atau sukses)
+             statusContainerDiv.classList.toggle('bg-red-100', isError);
+             statusContainerDiv.classList.toggle('dark:bg-red-900', isError);
+             statusDisplay.classList.toggle('text-red-700', isError);
+             statusDisplay.classList.toggle('dark:text-red-300', isError);
+             
+             if(!isError) {
+                statusContainerDiv.classList.remove('bg-red-100', 'dark:bg-red-900');
+                statusDisplay.classList.remove('text-red-700', 'dark:text-red-300');
+             }
+        }
+    </script>
+</body>
+</html>
