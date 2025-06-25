@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Konverter PDF (Gambar) ke Excel dengan OCR</title>
+    <title>Konverter PDF Timesheet ke Excel dengan OCR</title>
     
     <!-- Menggunakan Tailwind CSS untuk styling yang modern -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -19,7 +19,6 @@
         body {
             font-family: 'Inter', sans-serif;
         }
-        /* Menghapus loader lama, karena sudah tidak dipakai */
         .file-input-label {
             cursor: pointer;
             transition: all 0.2s ease-in-out;
@@ -30,17 +29,31 @@
         #progress-bar {
             transition: width 0.3s ease-in-out;
         }
+        /* Style untuk preview table */
+        #preview-container table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        #preview-container th, #preview-container td {
+            border: 1px solid #e2e8f0;
+            padding: 0.5rem;
+            text-align: center;
+        }
+        #preview-container th {
+            background-color: #f7fafc;
+        }
     </style>
-     <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 flex items-center justify-center min-h-screen p-4">
 
-    <div class="w-full max-w-2xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 space-y-6">
+    <div class="w-full max-w-4xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 space-y-6">
         <div class="text-center">
             <h1 class="text-3xl font-bold text-indigo-600 dark:text-indigo-400">Timesheet PDF to Excel</h1>
-            <p class="text-gray-600 dark:text-gray-400 mt-2">Convert PDF with timesheet to Excel sheet</p>
+            <p class="text-gray-600 dark:text-gray-400 mt-2">Ubah PDF Timesheet menjadi lembar Excel dengan pewarnaan otomatis.</p>
         </div>
 
         <!-- Area Input File -->
@@ -56,21 +69,36 @@
             </div>
             <p id="file-name" class="text-center text-sm text-gray-500 dark:text-gray-400">Belum ada file yang dipilih.</p>
         </div>
+         
+        <!-- Area Pilih Periode Bulan & Tahun -->
+        <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-4 space-y-2 sm:space-y-0">
+             <label for="periode-dari" class="block font-medium text-gray-700 dark:text-gray-200">Periode:</label>
+             <input type="month" id="periode-dari" class="w-full sm:w-auto border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100" value="2025-05">
+             <span class="text-center sm:text-left">s/d</span>
+             <input type="month" id="periode-ke" class="w-full sm:w-auto border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100" value="2025-06">
+        </div>
 
-        <!-- Tombol Konversi -->
-        <div>
-            <button id="convert-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors" disabled>
-                Konversi ke Excel
+        <!-- Tombol Aksi -->
+        <div class="flex space-x-4">
+            <button id="preview-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors" disabled>
+                Buat Preview
+            </button>
+            <button id="download-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg hidden">
+                Download Excel
             </button>
         </div>
         
         <!-- Area Status dan Hasil -->
         <div id="status-container" class="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg min-h-[100px] flex flex-col items-center justify-center space-y-3">
-             <p id="status" class="text-gray-500 dark:text-gray-300">Silakan pilih file PDF dan klik konversi.</p>
-             <!-- Elemen Progress Bar Baru -->
-             <div id="progress-container" class="w-full bg-gray-200 rounded-full h-4 dark:bg-gray-700 hidden">
-                <div id="progress-bar" class="bg-indigo-600 h-4 rounded-full text-xs font-medium text-blue-100 text-center p-0.5 leading-none" style="width: 0%"></div>
+             <p id="status" class="text-gray-500 dark:text-gray-300">Silakan pilih file PDF dan klik "Buat Preview".</p>
+             <div id="progress-container" class="w-full bg-gray-200 rounded-full h-4 dark:bg-gray-600 hidden">
+                 <div id="progress-bar" class="bg-indigo-600 h-4 rounded-full text-xs font-medium text-blue-100 text-center p-0.5 leading-none" style="width: 0%"></div>
              </div>
+        </div>
+
+        <!-- Area untuk menampilkan preview tabel -->
+        <div id="preview-container" class="mt-6 p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 overflow-x-auto">
+            <!-- Preview akan dirender di sini -->
         </div>
 
     </div>
@@ -81,43 +109,63 @@
 
         // Seleksi elemen DOM
         const pdfFileInput = document.getElementById('pdf-file');
-        const convertBtn = document.getElementById('convert-btn');
+        const previewBtn = document.getElementById('preview-btn');
+        const downloadBtn = document.getElementById('download-btn');
         const fileNameDisplay = document.getElementById('file-name');
         const statusDisplay = document.getElementById('status');
         const progressContainer = document.getElementById('progress-container');
         const progressBar = document.getElementById('progress-bar');
+        const previewContainer = document.getElementById('preview-container');
         const statusContainerDiv = document.getElementById('status-container');
+        const periodeDariInput = document.getElementById('periode-dari');
+        const periodeKeInput = document.getElementById('periode-ke');
 
         let selectedFile = null;
+        let processedData = null; // Menyimpan data hasil proses untuk di-download
+        let periodeDari = '2025-05';
+        let periodeKe = '2025-06';
 
         // Event listener saat file dipilih
         pdfFileInput.addEventListener('change', (event) => {
             selectedFile = event.target.files[0];
             if (selectedFile) {
                 fileNameDisplay.textContent = `File terpilih: ${selectedFile.name}`;
-                convertBtn.disabled = false;
+                previewBtn.disabled = false;
+                downloadBtn.classList.add('hidden');
+                previewContainer.innerHTML = '';
             } else {
                 fileNameDisplay.textContent = 'Belum ada file yang dipilih.';
-                convertBtn.disabled = true;
+                previewBtn.disabled = true;
+            }
+        });
+        
+        periodeDariInput.addEventListener('change', (e) => { periodeDari = e.target.value; });
+        periodeKeInput.addEventListener('change', (e) => { periodeKe = e.target.value; });
+
+        // Event listener untuk tombol preview dan download
+        previewBtn.addEventListener('click', handleConversion);
+        downloadBtn.addEventListener('click', () => {
+            if (processedData && selectedFile) {
+                generateExcel(processedData, selectedFile.name.replace('.pdf', ''));
+            } else {
+                alert('Tidak ada data untuk di-download. Silakan buat preview terlebih dahulu.');
             }
         });
 
-        // Event listener saat tombol konversi diklik
-        convertBtn.addEventListener('click', handleConversion);
-
         /**
-         * Fungsi utama untuk menangani proses konversi dari PDF ke Excel
+         * Fungsi utama untuk menangani proses konversi dari PDF ke data JSON
          */
         async function handleConversion() {
             if (!selectedFile) {
                 updateStatus('Error: Tidak ada file yang dipilih.', true);
                 return;
             }
-
-            // Reset UI dan tampilkan progress bar
-            convertBtn.disabled = true;
+            // Reset UI
+            previewBtn.disabled = true;
+            downloadBtn.classList.add('hidden');
             pdfFileInput.disabled = true;
             progressContainer.classList.remove('hidden');
+            previewContainer.innerHTML = '';
             updateProgress(0, 0, 0);
             
             try {
@@ -131,235 +179,285 @@
                     const allPagesData = [];
 
                     for (let i = 1; i <= numPages; i++) {
-                        // Update progress bar untuk setiap halaman
-                        const progress = Math.round(((i-1) / numPages) * 100);
-                        updateProgress(progress, i, numPages);
-                        
+                        updateProgress(Math.round(((i-1) / numPages) * 100), i, numPages);
                         const page = await pdf.getPage(i);
                         const viewport = page.getViewport({ scale: 2.0 });
                         const canvas = document.createElement('canvas');
-                        const context = canvas.getContext('2d');
                         canvas.height = viewport.height;
                         canvas.width = viewport.width;
+                        const context = canvas.getContext('2d');
                         await page.render({ canvasContext: context, viewport: viewport }).promise;
-
-                        const imageDataUrl = canvas.toDataURL('image/jpeg');
-                        const base64ImageData = imageDataUrl.split(',')[1];
-
+                        const base64ImageData = canvas.toDataURL('image/jpeg').split(',')[1];
                         const structuredData = await getStructuredDataFromImage(base64ImageData, i);
-                        if (structuredData) {
-                            allPagesData.push(structuredData);
-                        }
+                        if (structuredData) allPagesData.push(structuredData);
                     }
 
                     if (allPagesData.length > 0) {
-                        updateProgress(100, numPages, numPages, 'Membuat file Excel...');
-                        generateExcel(allPagesData, selectedFile.name.replace('.pdf', ''));
-                        // Memberi sedikit jeda sebelum menampilkan pesan sukses
-                        setTimeout(() => {
-                           updateStatus(`Konversi berhasil! File Excel telah diunduh.`, false);
-                        }, 500);
+                        processedData = allPagesData;
+                        updateProgress(100, numPages, numPages, 'Membuat preview...');
+                        renderPreview(processedData);
+                        updateStatus('Preview berhasil dibuat. Anda sekarang bisa men-download file Excel.', false);
+                        downloadBtn.classList.remove('hidden');
                     } else {
                         updateStatus('Tidak ada data yang dapat diekstrak dari PDF.', true);
                     }
+                    
+                    previewBtn.disabled = false;
+                    pdfFileInput.disabled = false;
+                    progressContainer.classList.add('hidden');
                 };
 
-                fileReader.onerror = () => {
-                    updateStatus('Error: Gagal membaca file PDF.', true);
-                };
+                fileReader.onerror = () => updateStatus('Error: Gagal membaca file PDF.', true);
 
             } catch (error) {
                 console.error('Terjadi kesalahan:', error);
                 updateStatus(`Error: ${error.message}`, true);
-            } finally {
-                // Jangan reset UI disini, biarkan updateStatus yang mengontrolnya
+                previewBtn.disabled = false;
+                pdfFileInput.disabled = false;
             }
         }
 
         async function getStructuredDataFromImage(base64ImageData, pageNumber) {
-            const model = 'gemini-2.0-flash';
-            const apiKey = "AIzaSyAHlg7c4qj8AWdueBeHS_4Y4m1ZOPMypq8";
+            const model = 'gemini-2.0-flash'; 
+            const apiKey = "AIzaSyBiGJ2FuKOZvMvYDteueIPd5YJcacgycwU"; // API Key dikosongkan untuk keamanan
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
             const prompt = `
-            Analisis gambar timesheet ini dan ekstrak informasi dalam format JSON yang terstruktur.
+            Analisis gambar timesheet. Ekstrak data ke format JSON.
+            HANYA KEMBALIKAN BLOK KODE JSON, tidak ada teks lain.
+            PASTIKAN JSON SELALU VALID. Jangan gunakan koma di akhir (trailing comma).
 
-            TUGAS:
-            1.  **Ekstrak Informasi Header:** Temukan dan ekstrak data berikut: Nama, Posisi, Level, Lokasi, dan No. Badge. Jika salah satu data tidak ada, biarkan nilainya string kosong.
-            2.  **Gunakan Nama untuk Nama Sheet:** Gunakan nilai dari "Nama" yang ditemukan sebagai nilai untuk "sheetName".
-            3.  **Ekstrak Data Tabel Utama:** Ambil semua baris dari tabel timesheet.
-
-            ATURAN KETAT:
-            - **Format Waktu:** Untuk kolom yang berisi waktu (seperti 'Time In', 'Time Out'), format nilainya sebagai "HH:MM". Contoh: '0800' menjadi "08:00", '1730' menjadi "17:30". Jika waktu tidak ada, gunakan string kosong.
-            - **Isi Sel Kosong:** Jika dalam satu baris, kolom waktu (Time In/Out) kosong, periksa kolom aktivitas di baris tersebut. Jika aktivitasnya "Sakit", isi sel waktu yang kosong dengan "S". Jika "Field Break", isi dengan "FB". Jika "Izin", isi dengan "I". Lakukan hal yang sama untuk keterangan sejenis lainnya.
-            - **JANGAN SERTAKAN** logo perusahaan atau nama perusahaan dari kop surat. Hanya ekstrak 5 bidang data yang diminta di atas.
-            - **JANGAN SERTAKAN** kolom "Remarks" dan "Sign" (atau kolom sejenis untuk tanda tangan/catatan) dari tabel.
-            - **JANGAN SERTAKAN** seluruh bagian footer (misalnya "Prepared by", "Approved by", dan area tanda tangan di bawah tabel).
-            - Jika ada baris kosong di dalam tabel, sertakan sebagai array kosong.
-
-            KEMBALIKAN HANYA JSON dengan struktur ini. JANGAN TAMBAHKAN TEKS LAIN SEBELUM ATAU SESUDAH JSON:
+            Gunakan struktur ini:
             {
-              "sheetName": "Nama Personel yang Ditemukan",
+              "sheetName": "NAMA PERSONEL",
               "headerInfo": {
-                "Nama": "Nilai Nama",
-                "Posisi": "Nilai Posisi",
-                "Level": "Nilai Level",
-                "Lokasi": "Nilai Lokasi",
-                "No. Badge": "Nilai No. Badge"
+                "Nama": "NAMA PERSONEL",
+                "Posisi": "POSISI",
+                "Level": "LEVEL",
+                "Lokasi": "LOKASI",
+                "No. Badge": "NOMOR BADGE"
               },
               "tableData": [
-                ["Header Kolom 1", "Header Kolom 2"],
-                ["Data Baris 1 Kolom 1", "Data Baris 1 Kolom 2"],
-                ["Data Baris 2 Kolom 1", "Data Baris 2 Kolom 2"]
+                ["No", "Hari", "Tanggal", "Time in", "Time out"],
+                ["1", "Senin", "19-May-2025", "07:00", "17:00"],
+                ["6", "Sabtu", "24-May-2025", "OFF", "OFF"]
               ]
             }
 
-            Jika nama tidak bisa ditemukan sama sekali, gunakan "Halaman ${pageNumber}" untuk sheetName.
+            ATURAN:
+            - Format tanggal persis "DD-Mon-YYYY".
+            - Format waktu persis "HH:MM".
+            - Jika nama tidak ada, 'sheetName' diisi "Halaman ${pageNumber}".
             `;
             
             const payload = {
-                contents: [{
-                    role: "user",
-                    parts: [
-                        { text: prompt },
-                        { inlineData: { mimeType: "image/jpeg", data: base64ImageData } }
-                    ]
-                }],
-                 generationConfig: {
-                    responseMimeType: "application/json",
-                }
+                contents: [{ parts: [ { text: prompt }, { inlineData: { mimeType: "image/jpeg", data: base64ImageData } } ] }],
+                generationConfig: { responseMimeType: "application/json" }
             };
 
             try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                if (!response.ok) {
-                    const errorBody = await response.json();
-                    throw new Error(`API Error: ${response.status} ${response.statusText} - ${errorBody.error.message}`);
-                }
-                
+                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!response.ok) throw new Error(`API Error: ${response.status}`);
                 const result = await response.json();
-                
-                if (result.candidates && result.candidates.length > 0) {
-                    const jsonString = result.candidates[0].content.parts[0].text;
-                    return JSON.parse(jsonString);
-                } else {
-                    return { sheetName: `Halaman ${pageNumber}`, tableData: [["Gagal mengekstrak data."]] };
-                }
+                const jsonString = result.candidates[0].content.parts[0].text;
+                let cleanedJsonString = jsonString.replace(/```json\n?/g, '').replace(/```\n?$/, '').replace(/,(?=\s*[}\]])/g, '');
+                return JSON.parse(cleanedJsonString);
             } catch (error) {
+                console.error(`Error saat OCR: ${error.message}`);
                 return { sheetName: `Halaman ${pageNumber} (Error)`, tableData: [[`Error saat OCR: ${error.message}`]] };
             }
         }
+        
+        const tanggalMerah = ['2025-01-01', '2025-01-27', '2025-01-29', '2025-03-29', '2025-03-31', '2025-04-01', '2025-04-18', '2025-05-01', '2025-05-12', '2025-05-29', '2025-06-01', '2025-06-06', '2025-06-26', '2025-08-17', '2025-09-05', '2025-12-25'];
+        const monthMap = { 'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'may': 4, 'jun': 5, 'jul': 6, 'aug': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dec': 11 };
 
+        function parseDate(dateStr) {
+            if (!dateStr || typeof dateStr !== 'string') return null;
+            const str = dateStr.trim();
+            const monthMatch = str.match(/(\d{1,2})\s*[-/]\s*([a-zA-Z]{3})\s*[-/]\s*(\d{2,4})/);
+            if (monthMatch) {
+                const day = parseInt(monthMatch[1], 10), monthKey = monthMatch[2].toLowerCase();
+                let year = parseInt(monthMatch[3], 10);
+                if (year < 100) year += 2000;
+                if (monthMap[monthKey] !== undefined) return new Date(Date.UTC(year, monthMap[monthKey], day));
+            }
+            const d = new Date(str);
+            return !isNaN(d.getTime()) ? new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())) : null;
+        }
+        
+        function getHighlightInfo(dateStr) {
+            const date = parseDate(dateStr);
+            if (!date) return null;
+            const dayOfWeek = date.getUTCDay(), isoDate = date.toISOString().slice(0, 10);
+            if (tanggalMerah.includes(isoDate)) return { type: 'holiday' };
+            if (dayOfWeek === 0 || dayOfWeek === 6) return { type: 'weekend' };
+            return null;
+        }
+        
+        function renderPreview(allPagesData) {
+            previewContainer.innerHTML = '';
+            allPagesData.forEach(pageData => {
+                const sheetDiv = document.createElement('div');
+                sheetDiv.className = 'mb-8';
+
+                const sheetTitle = document.createElement('h3');
+                sheetTitle.className = 'text-xl font-bold mb-2 text-gray-800 dark:text-gray-200';
+                sheetTitle.textContent = pageData.sheetName || 'Untitled Sheet';
+                sheetDiv.appendChild(sheetTitle);
+
+                const table = document.createElement('table');
+                table.className = 'w-full text-sm text-left text-gray-500 dark:text-gray-400';
+                const thead = document.createElement('thead');
+                const tbody = document.createElement('tbody');
+
+                const finalSheetData = [];
+                if (pageData.headerInfo) {
+                    Object.entries(pageData.headerInfo).forEach(([key, value]) => finalSheetData.push({type: 'info', data: [key, value || ""]}));
+                    finalSheetData.push({type: 'spacer'});
+                }
+                 if (pageData.tableData && Array.isArray(pageData.tableData)) {
+                    if(pageData.tableData[0]) finalSheetData.push({type: 'header', data: pageData.tableData[0]});
+                    pageData.tableData.slice(1).forEach(row => finalSheetData.push({type: 'data', data: row}));
+                 }
+
+                let tanggalColIdx = pageData.tableData?.[0]?.findIndex(h => h?.toLowerCase().includes('tanggal')) ?? -1;
+                let hariColIdx = pageData.tableData?.[0]?.findIndex(h => h?.toLowerCase().includes('hari')) ?? -1;
+
+                finalSheetData.forEach(rowData => {
+                    const tr = document.createElement('tr');
+                    
+                    if(rowData.type === 'spacer' || !rowData.data) {
+                        tr.innerHTML = `<td colspan="5" class="h-4 border-none"></td>`;
+                        tbody.appendChild(tr);
+                        return;
+                    }
+                    if(rowData.type === 'info') {
+                        tr.innerHTML = `<td class="font-bold p-2 text-left border-none">${rowData.data[0]}</td><td class="p-2 text-left border-none" colspan="4">${rowData.data[1]}</td>`;
+                        tbody.appendChild(tr);
+                        return;
+                    }
+                    if(rowData.type === 'header'){
+                         tr.className = 'bg-yellow-300 text-black font-bold';
+                         rowData.data.forEach(cell => {
+                            const th = document.createElement('th');
+                            th.textContent = cell;
+                            tr.appendChild(th);
+                         });
+                         thead.appendChild(tr);
+                         return;
+                    }
+                    
+                    const highlight = getHighlightInfo(rowData.data[tanggalColIdx]);
+                    if(highlight?.type === 'weekend') tr.className = 'bg-yellow-100 dark:bg-yellow-900';
+                    if(highlight?.type === 'holiday') tr.className = 'bg-red-100 dark:bg-red-900';
+
+                    rowData.data.forEach((cell, cellIdx) => {
+                        const td = document.createElement('td');
+                        td.textContent = cell;
+                        if (highlight && cellIdx === hariColIdx ) {
+                             td.className = "text-red-600 font-semibold";
+                        }
+                        tr.appendChild(td);
+                    });
+                    tbody.appendChild(tr);
+                });
+                
+                table.appendChild(thead);
+                table.appendChild(tbody);
+                sheetDiv.appendChild(table);
+                previewContainer.appendChild(sheetDiv);
+            });
+        }
+
+        // [PENDEKATAN TOTAL BARU] Fungsi generateExcel ditulis ulang dari nol
         function generateExcel(allPagesData, baseFileName) {
             const workbook = XLSX.utils.book_new();
 
-            allPagesData.forEach((pageData, index) => {
-                let sheetName = pageData.sheetName || `Sheet ${index + 1}`;
-                sheetName = sheetName.substring(0, 31).replace(/[\/\\?*\[\]]/g, '');
-                if (workbook.SheetNames.includes(sheetName)) {
-                    sheetName = `${sheetName.substring(0, 27)} (${index + 1})`;
-                }
+            allPagesData.forEach((pageData) => {
+                const sheetName = (pageData.sheetName || 'Sheet').substring(0, 31).replace(/[\/\\?*\[\]]/g, '');
                 
-                const dataForSheet = [];
-                let tableHeaderRowIndex = 0;
-
+                // 1. Gabungkan semua data menjadi satu array
+                const finalSheetData = [];
                 if (pageData.headerInfo) {
-                    dataForSheet.push(["Nama", pageData.headerInfo.Nama || ""]);
-                    dataForSheet.push(["Posisi", pageData.headerInfo.Posisi || ""]);
-                    dataForSheet.push(["Level", pageData.headerInfo.Level || ""]);
-                    dataForSheet.push(["Lokasi", pageData.headerInfo.Lokasi || ""]);
-                    dataForSheet.push(["No. Badge", pageData.headerInfo['No. Badge'] || ""]);
-                    dataForSheet.push([]);
-                    tableHeaderRowIndex = 5;
+                    Object.entries(pageData.headerInfo).forEach(([k, v]) => finalSheetData.push([k, v || ""]));
+                    finalSheetData.push([]); // Baris kosong
+                }
+                const tableHeaderRowIndex = finalSheetData.length;
+                if (pageData.tableData && Array.isArray(pageData.tableData)) {
+                    finalSheetData.push(...pageData.tableData);
                 }
                 
-                const finalSheetData = dataForSheet.concat(pageData.tableData || []);
+                // 2. Buat worksheet dari data mentah
                 const worksheet = XLSX.utils.aoa_to_sheet(finalSheetData);
 
-                const colWidths = [];
-                finalSheetData.forEach(row => {
-                    row.forEach((cell, i) => {
-                        const cellLen = cell ? String(cell).length : 10;
-                        if (!colWidths[i] || cellLen > colWidths[i]) {
-                            colWidths[i] = cellLen;
-                        }
-                    });
-                });
-                worksheet['!cols'] = colWidths.map(w => ({ wch: w + 2 }));
+                // 3. Cari kolom penting
+                const header = pageData.tableData?.[0] || [];
+                const tanggalColIdx = header.findIndex(h => h?.toLowerCase().includes('tanggal'));
+                const hariColIdx = header.findIndex(h => h?.toLowerCase().includes('hari'));
 
-                const borderStyle = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+                // 4. Atur lebar kolom
+                worksheet['!cols'] = header.map(() => ({ wch: 15 }));
+
+                // 5. Iterasi dan terapkan gaya sel per sel
                 const range = XLSX.utils.decode_range(worksheet['!ref']);
                 for (let R = range.s.r; R <= range.e.r; ++R) {
                     for (let C = range.s.c; C <= range.e.c; ++C) {
                         const cell_ref = XLSX.utils.encode_cell({ c: C, r: R });
                         if (!worksheet[cell_ref]) continue;
 
-                        if (R < tableHeaderRowIndex && C === 0) {
-                            worksheet[cell_ref].s = { font: { bold: true } };
-                        }
+                        // Buat objek gaya baru untuk setiap sel
+                        let style = { 
+                            font: { name: "Calibri", sz: 11 },
+                            alignment: { vertical: "center" }
+                        };
 
-                        if (R === tableHeaderRowIndex + 1) {
-                            worksheet[cell_ref].s = {
-                                font: { bold: true, color: { rgb: "FFFFFF" } },
-                                fill: { fgColor: { rgb: "4F81BD" } },
-                                border: borderStyle
-                            };
-                        } else if (R > tableHeaderRowIndex + 1 && finalSheetData[R] && finalSheetData[R].length > 0) {
-                            if (!worksheet[cell_ref].s) worksheet[cell_ref].s = {};
-                            worksheet[cell_ref].s.border = borderStyle;
+                        if (R < tableHeaderRowIndex) {
+                             style.alignment.horizontal = "left";
+                             if (C === 0) style.font.bold = true;
+                        } else {
+                            // Gaya default untuk semua sel data dan header tabel
+                            style.border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+                            style.alignment.horizontal = "center";
+                            
+                            if (R === tableHeaderRowIndex) { // Header Tabel
+                                style.font.bold = true;
+                                style.fill = { fgColor: { rgb: "FFFFFF00" } }; // Kuning
+                            } else { // Baris Data
+                                const dateValue = finalSheetData[R]?.[tanggalColIdx];
+                                const highlight = getHighlightInfo(dateValue);
+                                if (highlight) {
+                                    if(highlight.type === 'weekend') {
+                                        style.fill = { fgColor: { rgb: "FFFFFF00" } }; // Kuning
+                                    } else if(highlight.type === 'holiday') {
+                                        style.fill = { fgColor: { rgb: "FFFFC7CE" } }; // Merah Muda
+                                    }
+                                    
+                                    if (C === hariColIdx) {
+                                        style.font.color = { rgb: "FFFF0000" }; // Font Merah
+                                    }
+                                }
+                            }
                         }
+                        worksheet[cell_ref].s = style;
                     }
                 }
                 
                 XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
             });
-
-            XLSX.writeFile(workbook, `${baseFileName}_hasil_ocr_terformat.xlsx`);
+            XLSX.writeFile(workbook, `${baseFileName}_hasil_ocr.xlsx`);
         }
         
-        /**
-         * Memperbarui progress bar dan teks statusnya.
-         */
         function updateProgress(percentage, currentPage, totalPages, message) {
             progressBar.style.width = `${percentage}%`;
             progressBar.textContent = `${percentage}%`;
-            if(message) {
-                 statusDisplay.textContent = message;
-            } else if (totalPages > 0) {
-                statusDisplay.textContent = `Memproses halaman ${currentPage} dari ${totalPages}...`;
-            } else {
-                 statusDisplay.textContent = `Memulai...`;
-            }
+            statusDisplay.textContent = message || `Memproses halaman ${currentPage} dari ${totalPages}...`;
         }
 
-        /**
-         * Helper untuk memperbarui teks status final di UI.
-         */
         function updateStatus(message, isError = false) {
-             // Sembunyikan progress bar dan tampilkan pesan final
-             progressContainer.classList.add('hidden');
-             statusDisplay.textContent = message;
-
-             // Reset tombol
-             convertBtn.disabled = false;
-             pdfFileInput.disabled = false;
-             
-             // Atur warna berdasarkan status (error atau sukses)
-             statusContainerDiv.classList.toggle('bg-red-100', isError);
-             statusContainerDiv.classList.toggle('dark:bg-red-900', isError);
-             statusDisplay.classList.toggle('text-red-700', isError);
-             statusDisplay.classList.toggle('dark:text-red-300', isError);
-             
-             if(!isError) {
-                statusContainerDiv.classList.remove('bg-red-100', 'dark:bg-red-900');
-                statusDisplay.classList.remove('text-red-700', 'dark:text-red-300');
-             }
-        }
+              progressContainer.classList.add('hidden');
+              statusDisplay.textContent = message;
+              const statusClasses = isError ? 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300' : 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300';
+              statusContainerDiv.className = `text-center p-4 rounded-lg min-h-[100px] flex flex-col items-center justify-center space-y-3 ${statusClasses}`;
+         }
     </script>
 </body>
 </html>
