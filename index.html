@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Konverter PDF Timesheet ke Excel dengan OCR</title>
+    <title>Konverter PDF/Gambar Timesheet ke Excel dengan OCR</title>
     
     <!-- Menggunakan Tailwind CSS untuk styling yang modern -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -52,20 +52,34 @@
 
     <div class="w-full max-w-4xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 space-y-6">
         <div class="text-center">
-            <h1 class="text-3xl font-bold text-indigo-600 dark:text-indigo-400">Timesheet PDF to Excel</h1>
-            <p class="text-gray-600 dark:text-gray-400 mt-2">Ubah PDF Timesheet menjadi lembar Excel dengan pewarnaan otomatis.</p>
+            <h1 class="text-3xl font-bold text-indigo-600 dark:text-indigo-400">Timesheet PDF/Gambar to Excel</h1>
+            <p class="text-gray-600 dark:text-gray-400 mt-2">Ubah PDF atau Gambar Timesheet menjadi lembar Excel dengan pewarnaan otomatis.</p>
         </div>
 
         <!-- Area Input File -->
         <div class="space-y-4">
-            <div>
-                <label for="pdf-file" class="file-input-label inline-block w-full text-center bg-indigo-600 text-white font-semibold py-3 px-4 rounded-lg shadow-md">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 inline-block mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                    </svg>
-                    Pilih File PDF
-                </label>
-                <input type="file" id="pdf-file" class="hidden" accept=".pdf">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- PDF Upload -->
+                <div>
+                    <label for="pdf-file" class="file-input-label inline-block w-full text-center bg-indigo-600 text-white font-semibold py-3 px-4 rounded-lg shadow-md">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 inline-block mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Pilih File PDF (Bisa Banyak)
+                    </label>
+                    <input type="file" id="pdf-file" class="hidden" accept=".pdf" multiple>
+                </div>
+
+                <!-- Image Upload -->
+                <div>
+                    <label for="image-file" class="file-input-label inline-block w-full text-center bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg shadow-md">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 inline-block mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        Pilih File Gambar (Bisa Banyak)
+                    </label>
+                    <input type="file" id="image-file" class="hidden" accept="image/*,.jpg,.jpeg,.png,.gif,.bmp,.webp" multiple>
+                </div>
             </div>
             <p id="file-name" class="text-center text-sm text-gray-500 dark:text-gray-400">Belum ada file yang dipilih.</p>
         </div>
@@ -90,7 +104,7 @@
         
         <!-- Area Status dan Hasil -->
         <div id="status-container" class="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg min-h-[100px] flex flex-col items-center justify-center space-y-3">
-             <p id="status" class="text-gray-500 dark:text-gray-300">Silakan pilih file PDF dan klik "Buat Preview".</p>
+             <p id="status" class="text-gray-500 dark:text-gray-300">Silakan pilih file PDF atau gambar (bisa banyak) dan klik "Buat Preview".</p>
              <div id="progress-container" class="w-full bg-gray-200 rounded-full h-4 dark:bg-gray-600 hidden">
                  <div id="progress-bar" class="bg-indigo-600 h-4 rounded-full text-xs font-medium text-blue-100 text-center p-0.5 leading-none" style="width: 0%"></div>
              </div>
@@ -109,6 +123,7 @@
 
         // Seleksi elemen DOM
         const pdfFileInput = document.getElementById('pdf-file');
+        const imageFileInput = document.getElementById('image-file');
         const previewBtn = document.getElementById('preview-btn');
         const downloadBtn = document.getElementById('download-btn');
         const fileNameDisplay = document.getElementById('file-name');
@@ -120,24 +135,55 @@
         const periodeDariInput = document.getElementById('periode-dari');
         const periodeKeInput = document.getElementById('periode-ke');
 
-        let selectedFile = null;
+        let selectedFiles = []; // Array untuk menyimpan multiple files (PDF atau Image)
+        let fileType = null; // 'pdf' atau 'image'
         let processedData = null; // Menyimpan data hasil proses untuk di-download
         let periodeDari = '2025-05';
         let periodeKe = '2025-06';
 
         // Event listener saat file dipilih
-        pdfFileInput.addEventListener('change', (event) => {
-            selectedFile = event.target.files[0];
-            if (selectedFile) {
-                fileNameDisplay.textContent = `File terpilih: ${selectedFile.name}`;
-                previewBtn.disabled = false;
-                downloadBtn.classList.add('hidden');
-                previewContainer.innerHTML = '';
+        function handleFileSelection(event, type) {
+            fileType = type;
+            selectedFiles = Array.from(event.target.files);
+
+            // Reset input lainnya
+            if (type === 'pdf') {
+                imageFileInput.value = '';
+
+                if (selectedFiles.length > 0) {
+                    if (selectedFiles.length === 1) {
+                        fileNameDisplay.textContent = `File terpilih: ${selectedFiles[0].name} (PDF)`;
+                    } else {
+                        fileNameDisplay.textContent = `${selectedFiles.length} file PDF terpilih: ${selectedFiles.map(f => f.name).join(', ')}`;
+                    }
+                    previewBtn.disabled = false;
+                    downloadBtn.classList.add('hidden');
+                    previewContainer.innerHTML = '';
+                } else {
+                    fileNameDisplay.textContent = 'Belum ada file yang dipilih.';
+                    previewBtn.disabled = true;
+                }
             } else {
-                fileNameDisplay.textContent = 'Belum ada file yang dipilih.';
-                previewBtn.disabled = true;
+                pdfFileInput.value = '';
+
+                if (selectedFiles.length > 0) {
+                    if (selectedFiles.length === 1) {
+                        fileNameDisplay.textContent = `File terpilih: ${selectedFiles[0].name} (GAMBAR)`;
+                    } else {
+                        fileNameDisplay.textContent = `${selectedFiles.length} file gambar terpilih: ${selectedFiles.map(f => f.name).join(', ')}`;
+                    }
+                    previewBtn.disabled = false;
+                    downloadBtn.classList.add('hidden');
+                    previewContainer.innerHTML = '';
+                } else {
+                    fileNameDisplay.textContent = 'Belum ada file yang dipilih.';
+                    previewBtn.disabled = true;
+                }
             }
-        });
+        }
+
+        pdfFileInput.addEventListener('change', (event) => handleFileSelection(event, 'pdf'));
+        imageFileInput.addEventListener('change', (event) => handleFileSelection(event, 'image'));
         
         periodeDariInput.addEventListener('change', (e) => { periodeDari = e.target.value; });
         periodeKeInput.addEventListener('change', (e) => { periodeKe = e.target.value; });
@@ -145,42 +191,111 @@
         // Event listener untuk tombol preview dan download
         previewBtn.addEventListener('click', handleConversion);
         downloadBtn.addEventListener('click', () => {
-            if (processedData && selectedFile) {
-                generateExcel(processedData, selectedFile.name.replace('.pdf', ''));
+            if (processedData) {
+                let baseFileName = 'timesheet';
+
+                if (fileType === 'pdf') {
+                    if (selectedFiles.length === 1) {
+                        baseFileName = selectedFiles[0].name.replace('.pdf', '');
+                    } else if (selectedFiles.length > 1) {
+                        baseFileName = `multiple_pdfs_${selectedFiles.length}_files`;
+                    }
+                } else if (fileType === 'image') {
+                    if (selectedFiles.length === 1) {
+                        baseFileName = selectedFiles[0].name.replace(/\.[^/.]+$/, '');
+                    } else if (selectedFiles.length > 1) {
+                        baseFileName = `multiple_images_${selectedFiles.length}_files`;
+                    }
+                }
+
+                generateExcel(processedData, baseFileName);
             } else {
                 alert('Tidak ada data untuk di-download. Silakan buat preview terlebih dahulu.');
             }
         });
 
         /**
-         * Fungsi utama untuk menangani proses konversi dari PDF ke data JSON
+         * Fungsi utama untuk menangani proses konversi dari PDF/Gambar ke data JSON
          */
         async function handleConversion() {
-            if (!selectedFile) {
+            if (selectedFiles.length === 0 || !fileType) {
                 updateStatus('Error: Tidak ada file yang dipilih.', true);
                 return;
             }
+
             // Reset UI
             previewBtn.disabled = true;
             downloadBtn.classList.add('hidden');
             pdfFileInput.disabled = true;
+            imageFileInput.disabled = true;
             progressContainer.classList.remove('hidden');
             previewContainer.innerHTML = '';
             updateProgress(0, 0, 0);
-            
+
             try {
-                const fileReader = new FileReader();
-                fileReader.readAsArrayBuffer(selectedFile);
+                if (fileType === 'pdf') {
+                    await handlePDFConversion();
+                } else if (fileType === 'image') {
+                    await handleImageConversion();
+                }
+            } catch (error) {
+                console.error('Terjadi kesalahan:', error);
+                updateStatus(`Error: ${error.message}`, true);
+                previewBtn.disabled = false;
+                pdfFileInput.disabled = false;
+                imageFileInput.disabled = false;
+            }
+        }
 
-                fileReader.onload = async (event) => {
-                    const pdfData = new Uint8Array(event.target.result);
-                    const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
+        /**
+         * Fungsi untuk menangani konversi PDF (single atau multiple)
+         */
+        async function handlePDFConversion() {
+            const totalFiles = selectedFiles.length;
+            const allPagesData = [];
+            let totalPagesProcessed = 0;
+            let totalPagesCount = 0;
+
+            updateProgress(0, 0, totalFiles, `Memproses ${totalFiles} file PDF...`);
+
+            // Hitung total halaman dari semua PDF
+            for (let fileIndex = 0; fileIndex < totalFiles; fileIndex++) {
+                const file = selectedFiles[fileIndex];
+                try {
+                    const arrayBuffer = await readFileAsArrayBuffer(file);
+                    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+                    totalPagesCount += pdf.numPages;
+                } catch (error) {
+                    console.error(`Error reading PDF ${file.name}:`, error);
+                }
+            }
+
+            // Proses setiap PDF
+            for (let fileIndex = 0; fileIndex < totalFiles; fileIndex++) {
+                const file = selectedFiles[fileIndex];
+                const currentFileNum = fileIndex + 1;
+
+                updateProgress(
+                    Math.round((totalPagesProcessed / totalPagesCount) * 100),
+                    currentFileNum,
+                    totalFiles,
+                    `Memproses PDF ${currentFileNum}/${totalFiles}: ${file.name}`
+                );
+
+                try {
+                    const arrayBuffer = await readFileAsArrayBuffer(file);
+                    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
                     const numPages = pdf.numPages;
-                    const allPagesData = [];
 
-                    for (let i = 1; i <= numPages; i++) {
-                        updateProgress(Math.round(((i-1) / numPages) * 100), i, numPages);
-                        const page = await pdf.getPage(i);
+                    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+                        updateProgress(
+                            Math.round((totalPagesProcessed / totalPagesCount) * 100),
+                            currentFileNum,
+                            totalFiles,
+                            `Memproses PDF ${currentFileNum}/${totalFiles}, halaman ${pageNum}/${numPages}`
+                        );
+
+                        const page = await pdf.getPage(pageNum);
                         const viewport = page.getViewport({ scale: 2.0 });
                         const canvas = document.createElement('canvas');
                         canvas.height = viewport.height;
@@ -188,33 +303,118 @@
                         const context = canvas.getContext('2d');
                         await page.render({ canvasContext: context, viewport: viewport }).promise;
                         const base64ImageData = canvas.toDataURL('image/jpeg').split(',')[1];
-                        const structuredData = await getStructuredDataFromImage(base64ImageData, i);
-                        if (structuredData) allPagesData.push(structuredData);
+
+                        const structuredData = await getStructuredDataFromImage(base64ImageData, pageNum);
+                        if (structuredData) {
+                            // Tambahkan nama file ke sheet name jika multiple files
+                            if (totalFiles > 1) {
+                                structuredData.sheetName = `${file.name.replace('.pdf', '')} - ${structuredData.sheetName || `Halaman ${pageNum}`}`;
+                            }
+                            allPagesData.push(structuredData);
+                        }
+
+                        totalPagesProcessed++;
                     }
-
-                    if (allPagesData.length > 0) {
-                        processedData = allPagesData;
-                        updateProgress(100, numPages, numPages, 'Membuat preview...');
-                        renderPreview(processedData);
-                        updateStatus('Preview berhasil dibuat. Anda sekarang bisa men-download file Excel.', false);
-                        downloadBtn.classList.remove('hidden');
-                    } else {
-                        updateStatus('Tidak ada data yang dapat diekstrak dari PDF.', true);
-                    }
-                    
-                    previewBtn.disabled = false;
-                    pdfFileInput.disabled = false;
-                    progressContainer.classList.add('hidden');
-                };
-
-                fileReader.onerror = () => updateStatus('Error: Gagal membaca file PDF.', true);
-
-            } catch (error) {
-                console.error('Terjadi kesalahan:', error);
-                updateStatus(`Error: ${error.message}`, true);
-                previewBtn.disabled = false;
-                pdfFileInput.disabled = false;
+                } catch (error) {
+                    console.error(`Error processing PDF ${file.name}:`, error);
+                    // Tetap lanjutkan dengan file lainnya
+                    allPagesData.push({
+                        sheetName: `${file.name} (Error)`,
+                        tableData: [[`Error memproses ${file.name}: ${error.message}`]]
+                    });
+                }
             }
+
+            await finishConversion(allPagesData, totalPagesCount);
+        }
+
+        /**
+         * Fungsi untuk menangani konversi gambar (single atau multiple)
+         */
+        async function handleImageConversion() {
+            const totalFiles = selectedFiles.length;
+            const allPagesData = [];
+
+            updateProgress(0, 0, totalFiles, `Memproses ${totalFiles} file gambar...`);
+
+            for (let i = 0; i < selectedFiles.length; i++) {
+                const file = selectedFiles[i];
+                const currentFileNum = i + 1;
+
+                updateProgress(Math.round((i / totalFiles) * 100), currentFileNum, totalFiles, `Memproses gambar ${currentFileNum}/${totalFiles}: ${file.name}`);
+
+                try {
+                    const base64ImageData = await readFileAsBase64(file);
+                    updateProgress(Math.round(((i + 0.5) / totalFiles) * 100), currentFileNum, totalFiles, `Menganalisis gambar ${currentFileNum}/${totalFiles} dengan OCR...`);
+
+                    const structuredData = await getStructuredDataFromImage(base64ImageData, currentFileNum);
+                    if (structuredData) {
+                        // Tambahkan nama file ke sheet name jika multiple files
+                        if (totalFiles > 1) {
+                            structuredData.sheetName = `${file.name.replace(/\.[^/.]+$/, "")} - ${structuredData.sheetName || `Halaman ${currentFileNum}`}`;
+                        }
+                        allPagesData.push(structuredData);
+                    }
+                } catch (error) {
+                    console.error(`Error processing file ${file.name}:`, error);
+                    // Tetap lanjutkan dengan file lainnya
+                    allPagesData.push({
+                        sheetName: `${file.name} (Error)`,
+                        tableData: [[`Error memproses ${file.name}: ${error.message}`]]
+                    });
+                }
+            }
+
+            await finishConversion(allPagesData, totalFiles);
+        }
+
+        /**
+         * Helper function untuk membaca file sebagai base64
+         */
+        function readFileAsBase64(file) {
+            return new Promise((resolve, reject) => {
+                const fileReader = new FileReader();
+                fileReader.onload = (event) => {
+                    const base64Data = event.target.result.split(',')[1];
+                    resolve(base64Data);
+                };
+                fileReader.onerror = () => reject(new Error('Gagal membaca file'));
+                fileReader.readAsDataURL(file);
+            });
+        }
+
+        /**
+         * Helper function untuk membaca file sebagai ArrayBuffer (untuk PDF)
+         */
+        function readFileAsArrayBuffer(file) {
+            return new Promise((resolve, reject) => {
+                const fileReader = new FileReader();
+                fileReader.onload = (event) => {
+                    resolve(event.target.result);
+                };
+                fileReader.onerror = () => reject(new Error('Gagal membaca file PDF'));
+                fileReader.readAsArrayBuffer(file);
+            });
+        }
+
+        /**
+         * Fungsi untuk menyelesaikan proses konversi
+         */
+        async function finishConversion(allPagesData, totalPages) {
+            if (allPagesData.length > 0) {
+                processedData = allPagesData;
+                updateProgress(100, totalPages, totalPages, 'Membuat preview...');
+                renderPreview(processedData);
+                updateStatus('Preview berhasil dibuat. Anda sekarang bisa men-download file Excel.', false);
+                downloadBtn.classList.remove('hidden');
+            } else {
+                updateStatus(`Tidak ada data yang dapat diekstrak dari ${fileType === 'pdf' ? 'PDF' : 'gambar'}.`, true);
+            }
+
+            previewBtn.disabled = false;
+            pdfFileInput.disabled = false;
+            imageFileInput.disabled = false;
+            progressContainer.classList.add('hidden');
         }
 
         async function getStructuredDataFromImage(base64ImageData, pageNumber) {
@@ -273,21 +473,52 @@
         function parseDate(dateStr) {
             if (!dateStr || typeof dateStr !== 'string') return null;
             const str = dateStr.trim();
-            const monthMatch = str.match(/(\d{1,2})\s*[-/]\s*([a-zA-Z]{3})\s*[-/]\s*(\d{2,4})/);
+
+            // Pattern 1: DD-Mon-YYYY (seperti "21-Jun-2025")
+            const monthMatch = str.match(/(\d{1,2})\s*[-/]\s*([a-zA-Z]{3,})\s*[-/]\s*(\d{2,4})/);
             if (monthMatch) {
-                const day = parseInt(monthMatch[1], 10), monthKey = monthMatch[2].toLowerCase();
+                const day = parseInt(monthMatch[1], 10);
+                const monthKey = monthMatch[2].toLowerCase().substring(0, 3); // Ambil 3 huruf pertama
                 let year = parseInt(monthMatch[3], 10);
                 if (year < 100) year += 2000;
-                if (monthMap[monthKey] !== undefined) return new Date(Date.UTC(year, monthMap[monthKey], day));
+                if (monthMap[monthKey] !== undefined) {
+                    const parsedDate = new Date(Date.UTC(year, monthMap[monthKey], day));
+                    console.log(`Parsed date "${str}" -> ${parsedDate.toISOString()}`);
+                    return parsedDate;
+                }
             }
+
+            // Pattern 2: YYYY-MM-DD
+            const isoMatch = str.match(/(\d{4})\s*[-/]\s*(\d{1,2})\s*[-/]\s*(\d{1,2})/);
+            if (isoMatch) {
+                const year = parseInt(isoMatch[1], 10);
+                const month = parseInt(isoMatch[2], 10) - 1; // Month is 0-indexed
+                const day = parseInt(isoMatch[3], 10);
+                const parsedDate = new Date(Date.UTC(year, month, day));
+                console.log(`Parsed ISO date "${str}" -> ${parsedDate.toISOString()}`);
+                return parsedDate;
+            }
+
+            // Fallback: coba parse dengan Date constructor
             const d = new Date(str);
-            return !isNaN(d.getTime()) ? new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())) : null;
+            if (!isNaN(d.getTime())) {
+                const utcDate = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+                console.log(`Fallback parsed date "${str}" -> ${utcDate.toISOString()}`);
+                return utcDate;
+            }
+
+            console.log(`Failed to parse date: "${str}"`);
+            return null;
         }
         
         function getHighlightInfo(dateStr) {
             const date = parseDate(dateStr);
             if (!date) return null;
             const dayOfWeek = date.getUTCDay(), isoDate = date.toISOString().slice(0, 10);
+
+            // Debug logging untuk memastikan parsing bekerja
+            console.log(`Date: ${dateStr} -> Parsed: ${date.toISOString()} -> Day of week: ${dayOfWeek} (0=Sunday, 6=Saturday)`);
+
             if (tanggalMerah.includes(isoDate)) return { type: 'holiday' };
             if (dayOfWeek === 0 || dayOfWeek === 6) return { type: 'weekend' };
             return null;
@@ -374,7 +605,7 @@
 
             allPagesData.forEach((pageData) => {
                 const sheetName = (pageData.sheetName || 'Sheet').substring(0, 31).replace(/[\/\\?*\[\]]/g, '');
-                
+
                 // 1. Gabungkan semua data menjadi satu array
                 const finalSheetData = [];
                 if (pageData.headerInfo) {
@@ -385,7 +616,7 @@
                 if (pageData.tableData && Array.isArray(pageData.tableData)) {
                     finalSheetData.push(...pageData.tableData);
                 }
-                
+
                 // 2. Buat worksheet dari data mentah
                 const worksheet = XLSX.utils.aoa_to_sheet(finalSheetData);
 
@@ -393,46 +624,98 @@
                 const header = pageData.tableData?.[0] || [];
                 const tanggalColIdx = header.findIndex(h => h?.toLowerCase().includes('tanggal'));
                 const hariColIdx = header.findIndex(h => h?.toLowerCase().includes('hari'));
+                const timeInColIdx = header.findIndex(h => h?.toLowerCase().includes('time in') || h?.toLowerCase().includes('masuk'));
+                const timeOutColIdx = header.findIndex(h => h?.toLowerCase().includes('time out') || h?.toLowerCase().includes('keluar'));
 
-                // 4. Atur lebar kolom
-                worksheet['!cols'] = header.map(() => ({ wch: 15 }));
+                // 4. Atur lebar kolom dengan ukuran yang lebih optimal
+                const columnWidths = header.map((h, idx) => {
+                    if (idx === tanggalColIdx) return { wch: 18 }; // Tanggal lebih lebar
+                    if (idx === hariColIdx) return { wch: 12 }; // Hari sedang
+                    if (idx === timeInColIdx || idx === timeOutColIdx) return { wch: 12 }; // Waktu sedang
+                    return { wch: 10 }; // Default
+                });
+                worksheet['!cols'] = columnWidths;
 
-                // 5. Iterasi dan terapkan gaya sel per sel
+                // 5. Iterasi dan terapkan gaya sel per sel dengan formatting yang lebih baik
                 const range = XLSX.utils.decode_range(worksheet['!ref']);
                 for (let R = range.s.r; R <= range.e.r; ++R) {
                     for (let C = range.s.c; C <= range.e.c; ++C) {
                         const cell_ref = XLSX.utils.encode_cell({ c: C, r: R });
                         if (!worksheet[cell_ref]) continue;
 
-                        // Buat objek gaya baru untuk setiap sel
-                        let style = { 
+                        // Buat objek gaya baru untuk setiap sel dengan formatting yang lebih baik
+                        let style = {
                             font: { name: "Calibri", sz: 11 },
-                            alignment: { vertical: "center" }
+                            alignment: { vertical: "center", wrapText: true },
+                            border: {
+                                top: { style: "thin", color: { rgb: "FF000000" } },
+                                bottom: { style: "thin", color: { rgb: "FF000000" } },
+                                left: { style: "thin", color: { rgb: "FF000000" } },
+                                right: { style: "thin", color: { rgb: "FF000000" } }
+                            }
                         };
 
                         if (R < tableHeaderRowIndex) {
-                             style.alignment.horizontal = "left";
-                             if (C === 0) style.font.bold = true;
-                        } else {
-                            // Gaya default untuk semua sel data dan header tabel
-                            style.border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
-                            style.alignment.horizontal = "center";
-                            
-                            if (R === tableHeaderRowIndex) { // Header Tabel
+                            // Styling untuk header info (Nama, Posisi, dll)
+                            style.alignment.horizontal = "left";
+                            style.border = {}; // Hapus border untuk header info
+                            if (C === 0) {
                                 style.font.bold = true;
-                                style.fill = { fgColor: { rgb: "FFFFFF00" } }; // Kuning
-                            } else { // Baris Data
+                                style.font.color = { rgb: "FF1F4E79" }; // Biru tua
+                            }
+                        } else {
+                            // Gaya untuk tabel data
+                            style.alignment.horizontal = "center";
+
+                            if (R === tableHeaderRowIndex) {
+                                // Header Tabel - styling yang lebih menarik
+                                style.font.bold = true;
+                                style.font.color = { rgb: "FFFFFFFF" }; // Font putih
+                                style.fill = { fgColor: { rgb: "FF4472C4" } }; // Biru header
+                                style.alignment.horizontal = "center";
+                            } else {
+                                // Baris Data - deteksi weekend dan holiday
                                 const dateValue = finalSheetData[R]?.[tanggalColIdx];
+                                const hariValue = finalSheetData[R]?.[hariColIdx];
                                 const highlight = getHighlightInfo(dateValue);
-                                if (highlight) {
-                                    if(highlight.type === 'weekend') {
-                                        style.fill = { fgColor: { rgb: "FFFFFF00" } }; // Kuning
-                                    } else if(highlight.type === 'holiday') {
-                                        style.fill = { fgColor: { rgb: "FFFFC7CE" } }; // Merah Muda
-                                    }
-                                    
-                                    if (C === hariColIdx) {
-                                        style.font.color = { rgb: "FFFF0000" }; // Font Merah
+
+                                // Deteksi weekend berdasarkan nama hari juga (lebih robust)
+                                const isWeekendByName = hariValue && (
+                                    hariValue.toLowerCase().includes('sabtu') ||
+                                    hariValue.toLowerCase().includes('minggu') ||
+                                    hariValue.toLowerCase().includes('saturday') ||
+                                    hariValue.toLowerCase().includes('sunday') ||
+                                    hariValue.toLowerCase().includes('sat') ||
+                                    hariValue.toLowerCase().includes('sun')
+                                );
+
+                                // Debug logging untuk Excel generation
+                                console.log(`Excel Row ${R}: Date="${dateValue}", Day="${hariValue}", Highlight=${highlight?.type}, WeekendByName=${isWeekendByName}`);
+
+                                if (highlight?.type === 'weekend' || isWeekendByName) {
+                                    // SABTU & MINGGU - Background MERAH
+                                    style.fill = { fgColor: { rgb: "FFFF0000" } }; // Merah murni untuk lebih jelas
+                                    style.font.color = { rgb: "FFFFFFFF" }; // Font putih untuk kontras
+                                    style.font.bold = true;
+                                    console.log(`Applied weekend formatting to row ${R}`);
+                                } else if (highlight?.type === 'holiday') {
+                                    // HARI LIBUR NASIONAL - Background Merah Gelap
+                                    style.fill = { fgColor: { rgb: "FFDC3545" } }; // Merah gelap
+                                    style.font.color = { rgb: "FFFFFFFF" }; // Font putih
+                                    style.font.bold = true;
+                                    console.log(`Applied holiday formatting to row ${R}`);
+                                } else {
+                                    // HARI KERJA - Background putih
+                                    style.fill = { fgColor: { rgb: "FFFFFFFF" } }; // Putih
+                                    style.font.color = { rgb: "FF000000" }; // Font hitam
+                                }
+
+                                // Styling khusus untuk kolom waktu
+                                if (C === timeInColIdx || C === timeOutColIdx) {
+                                    const cellValue = finalSheetData[R]?.[C];
+                                    if (cellValue && (cellValue.toLowerCase().includes('off') || cellValue.toLowerCase().includes('libur'))) {
+                                        style.font.color = { rgb: "FFFF0000" }; // Font merah untuk OFF
+                                        style.font.bold = true;
                                     }
                                 }
                             }
